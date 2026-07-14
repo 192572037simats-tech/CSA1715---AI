@@ -1,121 +1,103 @@
 import heapq
 
-# Goal state
-GOAL = ((1, 2, 3),
-        (4, 5, 6),
-        (7, 8, 0))
+# Goal position dictionary
+goal_pos = {}
 
+# Calculate Manhattan Distance
+def heuristic(state):
+    distance = 0
+    for i in range(3):
+        for j in range(3):
+            value = state[i][j]
+            if value != 0:
+                x, y = goal_pos[value]
+                distance += abs(i - x) + abs(j - y)
+    return distance
 
-class PuzzleNode:
-    def __init__(self, state, parent=None, move="", g=0):
-        self.state = state
-        self.parent = parent
-        self.move = move
-        self.g = g  # Cost from start
-        self.h = self.manhattan_distance()
-        self.f = self.g + self.h
-
-    def manhattan_distance(self):
-        distance = 0
-        for i in range(3):
-            for j in range(3):
-                value = self.state[i][j]
-                if value != 0:
-                    goal_x = (value - 1) // 3
-                    goal_y = (value - 1) % 3
-                    distance += abs(i - goal_x) + abs(j - goal_y)
-        return distance
-
-    def __lt__(self, other):
-        return self.f < other.f
-
-
-def get_neighbors(state):
-    neighbors = []
-    directions = {
-        "Up": (-1, 0),
-        "Down": (1, 0),
-        "Left": (0, -1),
-        "Right": (0, 1)
-    }
-
-    # Find blank (0)
+# Find blank tile
+def find_blank(state):
     for i in range(3):
         for j in range(3):
             if state[i][j] == 0:
-                x, y = i, j
+                return i, j
 
-    for move, (dx, dy) in directions.items():
+# Generate possible moves
+def get_neighbors(state):
+    neighbors = []
+    x, y = find_blank(state)
+
+    moves = [(-1,0), (1,0), (0,-1), (0,1)]
+
+    for dx, dy in moves:
         nx, ny = x + dx, y + dy
         if 0 <= nx < 3 and 0 <= ny < 3:
-            new_state = [list(row) for row in state]
+            new_state = [row[:] for row in state]
             new_state[x][y], new_state[nx][ny] = new_state[nx][ny], new_state[x][y]
-            neighbors.append((tuple(map(tuple, new_state)), move))
+            neighbors.append(new_state)
 
     return neighbors
 
+# Convert list to tuple
+def state_to_tuple(state):
+    return tuple(tuple(row) for row in state)
 
-def reconstruct_path(node):
-    path = []
-    while node.parent:
-        path.append(node.move)
-        node = node.parent
-    return path[::-1]
-
-
-def a_star(start):
+# A* Search
+def solve(initial, goal):
     open_list = []
-    closed_set = set()
+    visited = set()
 
-    start_node = PuzzleNode(start)
-    heapq.heappush(open_list, start_node)
+    heapq.heappush(open_list, (heuristic(initial), 0, initial, []))
 
     while open_list:
-        current = heapq.heappop(open_list)
+        f, g, current, path = heapq.heappop(open_list)
 
-        if current.state == GOAL:
-            return reconstruct_path(current)
+        if current == goal:
+            return path + [current]
 
-        closed_set.add(current.state)
+        state_tuple = state_to_tuple(current)
 
-        for neighbor_state, move in get_neighbors(current.state):
-            if neighbor_state in closed_set:
-                continue
+        if state_tuple in visited:
+            continue
 
-            neighbor = PuzzleNode(
-                neighbor_state,
-                current,
-                move,
-                current.g + 1
-            )
-            heapq.heappush(open_list, neighbor)
+        visited.add(state_tuple)
+
+        for neighbor in get_neighbors(current):
+            if state_to_tuple(neighbor) not in visited:
+                heapq.heappush(
+                    open_list,
+                    (g + 1 + heuristic(neighbor), g + 1, neighbor, path + [current])
+                )
 
     return None
 
+# ---------------- MAIN PROGRAM ----------------
 
-def print_state(state):
-    for row in state:
-        print(row)
-    print()
+print("Enter Initial State (Use 0 for Blank):")
+initial = []
+for i in range(3):
+    row = list(map(int, input(f"Row {i+1}: ").split()))
+    initial.append(row)
 
+print("\nEnter Goal State:")
+goal = []
+for i in range(3):
+    row = list(map(int, input(f"Row {i+1}: ").split()))
+    goal.append(row)
 
-# Example initial state
-start_state = (
-    (1, 2, 3),
-    (4, 0, 6),
-    (7, 5, 8)
-)
+# Store goal positions
+for i in range(3):
+    for j in range(3):
+        goal_pos[goal[i][j]] = (i, j)
 
-print("Initial State:")
-print_state(start_state)
-
-solution = a_star(start_state)
+solution = solve(initial, goal)
 
 if solution:
-    print("Solution found!")
-    print("Number of moves:", len(solution))
-    print("Moves:")
-    for move in solution:
-        print(move)
+    print("\nSolution Found!")
+    print("Number of Moves =", len(solution)-1)
+
+    for step, state in enumerate(solution):
+        print(f"\nStep {step}")
+        for row in state:
+            print(row)
 else:
     print("No solution exists.")
